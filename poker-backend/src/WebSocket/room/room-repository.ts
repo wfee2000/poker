@@ -1,5 +1,4 @@
 import {Room} from "./room";
-import {User} from "../user/user";
 import {clearInterval} from "timers";
 
 export class RoomRepository {
@@ -31,6 +30,7 @@ export class RoomRepository {
                 clearInterval(room.timeout);
             }
         }, ONE_MINUTE));
+
         this.rooms.push(room);
         return room;
     }

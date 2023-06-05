@@ -1,8 +1,11 @@
 import {WebSocket} from "ws";
+import {Room} from "../room/room";
 
 export class User {
     public ws: WebSocket | null;
-    constructor(readonly id: number, readonly name: string, ws: WebSocket | null) {
-        this.ws = ws;
+    public currentRoom: Room | null;
+    constructor(readonly id: number, readonly name: string) {
+        this.ws = null;
+        this.currentRoom = null;
     }
 }

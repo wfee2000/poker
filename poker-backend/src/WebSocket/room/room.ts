@@ -1,4 +1,4 @@
-import {CloseEvent, WebSocket, WebSocketServer} from "ws";
+import {WebSocket, WebSocketServer} from "ws";
 import {User} from "../user/user";
 import {IncomingMessage} from "http";
 import {Duplex} from "stream";
@@ -17,15 +17,24 @@ export class Room extends WebSocketServer {
         }
 
         console.log(`Room ${this.id} received connection`);
-        // send ws amount of current waiting clients // TODO: JSON roomid && list users
-        this.users.push(new User(0, "", ws));
-        ws.onclose = (event) => {
+        // send ws amount of current waiting clients // TODO: JSON roomId && list users
+        let user = UserRepository.get(user => user.ws === ws)!
+        ws.onclose = () => {
             this.users.splice(this.users.findIndex(user => user.ws === ws), 1);
+            user.ws = null;
+            user.currentRoom = null;
             this.users.forEach(user => user.ws!.send("weg mit dir")) // TODO: JSON
         };
+
+        if (user.currentRoom != null) {
+            user.ws!.close();
+        }
+
+        user.currentRoom = this;
+        this.users.push(user);
     }
 
-    upgrade(request : IncomingMessage, socket : Duplex, head : Buffer, id: number) {
+    upgrade(request: IncomingMessage, socket: Duplex, head: Buffer, id: number): void {
         super.handleUpgrade(request, socket, head, (ws) => {
             let taken = !UserRepository.connectTo(id, ws);
 
