@@ -58,7 +58,7 @@ bower_components
 build/Release
 
 # Dependency directories
-*node_modules/
+**node_modules/
 jspm_packages/
 
 # Snowpack dependency directory (https://snowpack.dev/)
@@ -219,7 +219,7 @@ cmake-build-*/
 out/
 
 # mpeltonen/sbt-idea plugin
-*.idea_modules/
+**.idea_modules/
 
 # JIRA plugin
 atlassian-ide-plugin.xml
@@ -245,7 +245,7 @@ fabric.properties
 ### WebStorm+all Patch ###
 # Ignore everything
 
-*.idea/*
+**.idea/*
 
 ### Windows ###
 # Windows thumbnail cache files
