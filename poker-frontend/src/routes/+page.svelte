@@ -1,1 +1,4 @@
-<img src="/cards/spade/14.svg" alt="...">
+<script>
+	import Card from "$lib/card.svelte";
+</script>
+<Card suit="♥" rank={14} />
