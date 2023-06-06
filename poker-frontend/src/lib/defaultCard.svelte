@@ -1,0 +1,1 @@
+<img src={`/cards/default.svg`} alt="default card">
