@@ -10,5 +10,4 @@
     }
 </script>
 
-<img src={`/cards/${directory[suit]}/${rank}.svg`} alt="...">
-```
+<img src={`/cards/${directory[suit]}/${rank}.svg`} alt="{suit} {rank}">
