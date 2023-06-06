@@ -3,16 +3,15 @@
     import Logo from "$lib/logo.svelte";
 </script>
 
-<div class="flex items-center justify-around bg-onedark-darkblue">
+<div class="grid items-center justify-around grid-cols-3 bg-onedark-darkblue">
     <a href="/" class="p-2">
         <Logo/>
     </a>
-    <a href="/about" class="font-mono text-xl">About</a>
-    <a href="/contact" class="font-mono text-xl">Contact</a>
+    <a href="/rooms" class="font-mono text-2xl text-center">Rooms</a>
+    <a href="/auth/login" class="font-mono text-2xl text-center">Login</a>
 </div>
 
 <slot></slot>
-
 
 <style lang="postcss">
     :global(html) {
