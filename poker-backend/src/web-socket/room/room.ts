@@ -6,7 +6,6 @@ import {UserRepository} from "../user/user-repository";
 import {Game} from "../../game/game";
 import {CallbackType, GameMessage} from "../../game/game-types";
 import {MessageStructure} from "../model/message-structure";
-import {privateDecrypt} from "crypto";
 
 export class Room extends WebSocketServer {
     public started: boolean;
