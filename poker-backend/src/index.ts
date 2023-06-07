@@ -1,6 +1,6 @@
 import express, {Request, Response} from "express";
-import {UserRepository} from "./WebSocket/user/user-repository";
-import {RoomRepository} from "./WebSocket/room/room-repository";
+import {UserRepository} from "./web-socket/user/user-repository";
+import {RoomRepository} from "./web-socket/room/room-repository";
 
 const app = express();
 
