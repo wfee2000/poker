@@ -15,6 +15,10 @@ export class RoomRepository {
         return this.rooms.find(room => room.id);
     }
 
+    static getAllIds(): number[] {
+        return this.rooms.map(room => room.id);
+    }
+
     static async create(): Promise<Room | undefined>{
         const ONE_MINUTE= 60_000;
         let room: Room;

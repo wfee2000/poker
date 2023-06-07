@@ -1,6 +1,7 @@
 import express, {Request, Response} from "express";
 import {UserRepository} from "./web-socket/user/user-repository";
 import {RoomRepository} from "./web-socket/room/room-repository";
+import {Room} from "./web-socket/room/room";
 
 const app = express();
 
@@ -67,7 +68,22 @@ app.post("/logout", (req, res) => {
     }
 
     res.status(401).send("User was not logged in");
-})
+});
+
+app.get("/rooms", (req, res) => {
+    res.status(200).json(RoomRepository.getAllIds());
+});
+
+app.get("/rooms/:id", (req, res) => {
+    let room: Room | undefined = RoomRepository.get(parseInt(req.params.id));
+
+    if (!room) {
+        res.sendStatus(404);
+        return;
+    }
+
+    res.status(200).json({id: room.id, users: room.users, started: room.started});
+});
 
 const server = app.listen(5000);
 

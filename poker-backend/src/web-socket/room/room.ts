@@ -4,7 +4,7 @@ import {IncomingMessage} from "http";
 import {Duplex} from "stream";
 import {UserRepository} from "../user/user-repository";
 import {Game} from "../../game/game";
-import {CallbackType, GameMessage} from "../../game/game-types";
+import {CallbackType, GameActionResult, GameMessage} from "../../game/game-types";
 import {MessageStructure} from "../model/message-structure";
 
 export class Room extends WebSocketServer {
@@ -79,11 +79,14 @@ export class Room extends WebSocketServer {
                 } else {
                     if (object.context === "bet") {
                         // @ts-ignore TODO: hellp
-                        if (this.game.bet(object.content)) {
+                        let [success, message]: GameActionResult = this.game.bet(object.content);
+
+                        if (success) {
                             this.waitingPlayers.splice(
                                 this.waitingPlayers.indexOf(user), 1);
                         } else {
-                            user.ws!.send(JSON.stringify({context: "ERROR"}));
+                            user.ws!.send(JSON.stringify({context: "ERROR", content: message}));
+                            console.debug(message);
                         }
                     }
                 }
@@ -113,17 +116,24 @@ export class Room extends WebSocketServer {
             case CallbackType.CLIENT_CONFIRM:
                 this.waitingForOk = true;
                 this.next = next;
-                this.waitingPlayers.push(this.users.find(user => user.name === data.recipient ?? "")!);
+                let user = this.users.find(user => user.name === data.recipient ?? "")!;
+                this.waitingPlayers.push(user);
+                user.ws!.send(JSON.stringify(data));
                 break;
             case CallbackType.BROADCAST_CONFIRM:
                 this.waitingForOk = true;
                 this.next = next;
                 this.waitingPlayers = this.waitingPlayers.concat(this.users);
+                this.users.forEach(user => user.ws!.send(JSON.stringify(data)));
                 break;
             case CallbackType.SPECIFIC_CLIENT_WITH_RESULT:
-                this.waitingForOk = false;
-                this.waitingPlayers.push(this.users.find(user => user.name === data.recipient ?? "")!);
-                this.next = undefined;
+                {
+                    this.waitingForOk = false;
+                    let user = this.users.find(user => user.name === data.recipient ?? "")!;
+                    this.waitingPlayers.push(this.users.find(user => user.name === data.recipient ?? "")!);
+                    user.ws!.send(JSON.stringify(data));
+                    this.next = undefined;
+                }
                 break;
         }
     }
