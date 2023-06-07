@@ -28,16 +28,12 @@ export class UserRepository {
     static get(id: number): User | undefined;
     static get (predicate: (user: User) => boolean): User | undefined;
 
-    static get (param: unknown): unknown {
+    static get (param: number | ((user: User) => boolean)): User | undefined {
         if (typeof param === "number") {
             return this.get((user: User) => user.id === param);
         }
 
-        if (typeof param !== "function") {
-            return undefined;
-        }
-
-        return this.loggedInUsers.find(<(user: User) => boolean>param); // TODO: fix hard casting
+        return this.loggedInUsers.find(param);
     }
 
     static async connectTo(id: number, ws: WebSocket): Promise<boolean> {

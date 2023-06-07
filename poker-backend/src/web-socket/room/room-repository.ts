@@ -1,9 +1,11 @@
 import {Room} from "./room";
 import {clearInterval} from "timers";
+import {Mutex} from "async-mutex";
 
 export class RoomRepository {
     private static rooms: Array<Room> = [];
     private static roomIds: number[] = Array.from(Array(1000).keys());
+    private static mutex: Mutex = new Mutex();
 
     static get(id: number): Room | undefined {
         if (id < 1000) {
@@ -13,23 +15,30 @@ export class RoomRepository {
         return this.rooms.find(room => room.id);
     }
 
-    static create(): Room | undefined{
+    static async create(): Promise<Room | undefined>{
         const ONE_MINUTE= 60_000;
+        let room: Room;
 
-        if (this.roomIds.length === 0) {
-            return;
-        }
-
-        let room: Room = new Room(this.roomIds.shift()!, [], setInterval(() => {
-            if (room.users.length == 0) {
-                room.close();
-                this.rooms.splice(this.rooms.findIndex(roomToRemove => roomToRemove.id === room.id),
-                    1);
-                this.roomIds.push(room.id);
-                this.roomIds.sort();
-                clearInterval(room.timeout);
+        const release = await this.mutex.acquire();
+        try {
+            if (this.roomIds.length === 0) {
+                release();
+                return;
             }
-        }, ONE_MINUTE));
+
+            room = new Room(this.roomIds.shift()!, [], setInterval(() => {
+                if (room.users.length == 0) {
+                    room.close();
+                    this.rooms.splice(this.rooms.findIndex(roomToRemove => roomToRemove.id === room.id),
+                        1);
+                    this.roomIds.push(room.id);
+                    this.roomIds.sort();
+                    clearInterval(room.timeout);
+                }
+            }, ONE_MINUTE));
+        } finally {
+            release();
+        }
 
         this.rooms.push(room);
         return room;

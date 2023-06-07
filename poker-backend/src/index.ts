@@ -71,7 +71,7 @@ app.post("/logout", (req, res) => {
 
 const server = app.listen(5000);
 
-server.on("upgrade", (request, socket, head) => {
+server.on("upgrade", async (request, socket, head) => {
     if (!request.url) {
         socket.destroy();
         return;
@@ -96,7 +96,7 @@ server.on("upgrade", (request, socket, head) => {
     let room;
 
     if (roomId === null) {
-        room = RoomRepository.create();
+        room = await RoomRepository.create();
     } else {
         room = RoomRepository.get(parseInt(roomId));
     }
