@@ -1,9 +1,15 @@
 import {Player} from "./player";
-import {GameActionResult, GameState} from "./game-state";
-import {GameEvent} from "./game-event";
 import {rndInt} from "../utils";
 import {Card, Deck} from "./card";
-import {CallbackType} from "./callback-type";
+import {
+    CallbackType,
+    DistributeHandMessage,
+    GameActionResult,
+    GameEvent,
+    GameEventCallback,
+    GameState
+} from "./game-types";
+import {DistributeCardsData} from "./state-data/DistributeCardsData";
 
 export class Game {
     private static readonly MIN_PLAYERS: number = 2;
@@ -11,20 +17,17 @@ export class Game {
     private readonly mBigBlind: number;
     private readonly mSmallBlind: number;
     private readonly mStartBalance: number;
-    private readonly mGameEventCallback: (ev: GameEvent,
-                                          ct: CallbackType,
-                                          nxt: () => void,
-                                          data: any) => void;
+    private readonly mAvailableCards: Card[];
+    private readonly mGameEventCallback: GameEventCallback;
+
+    // State data
+    private readonly mDistributeCardsData: DistributeCardsData;
 
     private mCurrentState: GameState;
     private mPlayers: Player[];
-    private mCurrentPlayer: number;
-    private mAvailableCards: Card[];
+    private mCurrentActivePlayer: number;
 
-    public constructor(eventCallback: (ev: GameEvent,
-                                       ct: CallbackType,
-                                       nxt: () => void,
-                                       data: any) => void,
+    public constructor(eventCallback: GameEventCallback,
                        bigBlind: number = 10,
                        smallBlind: number = bigBlind / 2,
                        startBalance: number = bigBlind * 100) {
@@ -33,41 +36,35 @@ export class Game {
         this.mStartBalance = startBalance;
         this.mGameEventCallback = eventCallback;
         this.mPlayers = [];
-        this.mCurrentPlayer = 0;
+        this.mCurrentActivePlayer = 0;
         this.mAvailableCards = Deck.slice(0, Deck.length);
 
         this.mCurrentState = GameState.WAITING_FOR_PLAYERS;
+
+        this.mDistributeCardsData = new DistributeCardsData();
     }
 
     // region State management
-    private next(): void {
+    private update(): void {
         switch (this.mCurrentState) {
             case GameState.WAITING_FOR_PLAYERS:
-                // Nothing to do
+                // Do nothing
                 break;
             case GameState.DISTRIBUTE_CARDS:
                 this.distributeCards();
                 break;
-            case GameState.PREFLOP_BET:
+            default:
+                console.error(`Unknown game state!: ${GameState[this.mCurrentState]}`)
                 break;
-            case GameState.FLOP:
-                break;
-            case GameState.TURN_BET:
-                break;
-            case GameState.TURN:
-                break;
-            case GameState.RIVER_BET:
-                break;
-            case GameState.RIVER:
-                break;
-            case GameState.SHOWDOWN_BET:
-                break;
-            case GameState.SHOWDOWN:
-                break;
-            case GameState.CLEANUP:
+        }
+    }
+    private advanceState(): void {
+        switch (this.mCurrentState) {
+            case GameState.WAITING_FOR_PLAYERS:
+                this.mCurrentState = GameState.DISTRIBUTE_CARDS;
                 break;
             default:
-                console.error(`Unknown state!: ${this.mCurrentState}`);
+                console.error(`Unknown game state!: ${GameState[this.mCurrentState]}`)
                 break;
         }
     }
@@ -108,32 +105,53 @@ export class Game {
         }
 
         // Choose random player as current
-        this.mCurrentPlayer = rndInt(0, this.mPlayers.length - 1);
+        this.mCurrentActivePlayer = rndInt(0, this.mPlayers.length - 1);
 
-        // Change state
-        this.mCurrentState = GameState.DISTRIBUTE_CARDS;
+        // --> Distribute cards
+        this.advanceState();
 
         // Send event START_OK
-        this.mGameEventCallback(GameEvent.START_OK,
-                                CallbackType.BROADCAST_CONFIRM,
-                                this.next,
-                            null);
+        this.mGameEventCallback(CallbackType.BROADCAST_CONFIRM, this.update, {
+            recipient: null,
+            gameEvent: GameEvent.START_OK,
+            content: null
+        });
 
         return [true, null];
     }
-
     // endregion
 
     // region State: distribute cards
     private distributeCards(): void {
         if (this.mCurrentState !== GameState.DISTRIBUTE_CARDS) {
-            console.error(`Error: Invalid Game state ${GameState[this.mCurrentState]} for distribute cards`);
+            console.error("Bug: distribute cards called in wrong state!");
             return; // Refuse
         }
 
+        if (this.mDistributeCardsData.currentPlayerIndex === this.mPlayers.length - 1) {
+            // distributing cards done... --> Start first betting phase
+            this.advanceState();
+            return;
+        }
 
+        let player: Player = this.mPlayers[this.mDistributeCardsData.currentPlayerIndex];
+        let cards: Card[] = [];
+
+        for(let i: number = 0; i < Player.CARD_COUNT; i++) {
+            cards.push(this.mAvailableCards.splice(rndInt(0, this.mAvailableCards.length - 1), 1)[0]);
+        }
+
+        player.cards = cards;
+        this.mDistributeCardsData.currentPlayerIndex++;
+
+        this.mGameEventCallback(CallbackType.CLIENT_CONFIRM, this.update, {
+            recipient: player.name,
+            gameEvent: GameEvent.DISTRIBUTE_HAND,
+            content: player.cards
+        } as DistributeHandMessage);
     }
     // endregion
+
 
     // region Getters and Setters
     public get bigBlind(): number {
