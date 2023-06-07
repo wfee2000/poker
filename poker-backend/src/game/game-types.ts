@@ -13,6 +13,7 @@ export enum CallbackType {
 export enum GameEvent {
     START_OK, // Sent after the start function is called and completed sucessfully
     DISTRIBUTE_HAND, // Sent to specific player after hand was generated
+    BET_REQUEST, // Sent to specific player telling him to bet
 }
 
 export enum GameState {
@@ -36,5 +37,21 @@ export interface GameMessage {
 }
 
 export interface DistributeHandMessage extends GameMessage {
+    recipient: string,
     content: Card[]
+}
+
+export interface BetRequestMessage extends GameMessage {
+    recipient: string,
+    content: null
+}
+
+export interface BetResponseMessage extends GameMessage {
+    action: "raise" | "call" | "check" | "fold";
+    amount: number | null,
+}
+
+export function isBetResponseMessage(arg: any): arg is BetResponseMessage {
+    return arg && arg.action && typeof arg.action === "string" && "raise" in arg.action && "call" in arg.action
+        && "check" in arg.action && "fold" in arg.action && (typeof arg.amount === "number" || arg.amount === null);
 }

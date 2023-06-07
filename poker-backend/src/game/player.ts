@@ -28,6 +28,14 @@ export class Player {
         this.mCards = cards;
     }
 
+    public get balance(): number {
+        return this.mBalance;
+    }
+
+    public set balance(bal: number) {
+        this.mBalance = bal;
+    }
+
     public static get CARD_COUNT(): number {
         return Player.M_CARD_COUNT;
     }
