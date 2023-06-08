@@ -12,7 +12,8 @@ import {
     GameStartMessage,
     GameState,
     isValidBetResponseMessage,
-    PlayerUpdate, RevealCommunityCardsMessage
+    PlayerUpdate,
+    RevealCommunityCardsMessage
 } from "./game-types";
 import {DistributeCardsData} from "./state-data/DistributeCardsData";
 import {BetData} from "./state-data/BetData";
@@ -33,6 +34,7 @@ export class Game {
     private mCurrentState: GameState;
     private mPlayers: Player[];
     private mDealer: number;
+    private mPot: number;
 
     public constructor(eventCallback: GameEventCallback,
                        bigBlind: number = 10,
@@ -44,6 +46,7 @@ export class Game {
         this.mGameEventCallback = eventCallback;
         this.mPlayers = [];
         this.mDealer = 0;
+        this.mPot = 0;
         this.mAvailableCards = Deck.slice(0, Deck.length);
         this.mCurrentState = GameState.WAITING_FOR_PLAYERS;
 
@@ -73,9 +76,30 @@ export class Game {
                 this.distributeCards();
                 break;
             case GameState.PREFLOP_BET:
-                this.preflopBet();
+                this.computeBet();
                 break;
             case GameState.FLOP:
+                this.revealCards(3); // flop always reveals 3 cards
+                break;
+            case GameState.TURN_BET:
+                this.computeBet();
+                break;
+            case GameState.TURN:
+                this.revealCards(1); // turn always reveals 1 card
+                break;
+            case GameState.RIVER_BET:
+                this.computeBet();
+                break;
+            case GameState.RIVER:
+                this.revealCards(1); // river always reveals 1 card
+                break;
+            case GameState.SHOWDOWN_BET:
+                this.computeBet();
+                break;
+            case GameState.SHOWDOWN:
+                // TODO
+                break;
+            case GameState.CLEANUP:
                 // TODO
                 break;
             default:
@@ -91,9 +115,7 @@ export class Game {
                 this.mCurrentState = GameState.DISTRIBUTE_CARDS;
                 break;
             case GameState.DISTRIBUTE_CARDS:
-                this.mBetData.currentPlayerIdx = this.mDealer; // TODO: Proper poker behaviour
-                this.mBetData.playersToProcess = this.wasined(this.mDealer, this.mPlayers.length);
-                this.mBetData.lastBet = 0;
+                this.prepareBetRound();
                 this.mCurrentState = GameState.PREFLOP_BET;
                 break;
             case GameState.PREFLOP_BET:
@@ -101,7 +123,34 @@ export class Game {
                 this.mCurrentState = GameState.FLOP;
                 break;
             case GameState.FLOP:
+                this.prepareBetRound();
                 this.mCurrentState = GameState.TURN_BET;
+                break;
+            case GameState.TURN_BET:
+                this.mCurrentState = GameState.TURN;
+                break;
+            case GameState.TURN:
+                this.prepareBetRound();
+                this.mCurrentState = GameState.RIVER_BET;
+                break;
+            case GameState.RIVER_BET:
+                this.mCurrentState = GameState.RIVER;
+                break;
+            case GameState.RIVER:
+                this.prepareBetRound();
+                this.mCurrentState = GameState.SHOWDOWN_BET;
+                break;
+            case GameState.SHOWDOWN_BET:
+                this.mCurrentState = GameState.SHOWDOWN;
+                break;
+            case GameState.SHOWDOWN:
+                // TODO
+                this.mCurrentState = GameState.CLEANUP;
+                break;
+            case GameState.CLEANUP:
+                // TODO
+                // Im really unsure about this. Either a) W4p or b) dist cards or c) a new state?
+                this.mCurrentState = GameState.WAITING_FOR_PLAYERS;
                 break;
             default:
                 console.error(`Unknown game state!: ${GameState[this.mCurrentState]}`)
@@ -194,15 +243,22 @@ export class Game {
 
     // endregion
 
-    // region State: Preflop bet
-    private preflopBet(): void {
-        if (this.mCurrentState !== GameState.PREFLOP_BET) {
-            console.error("Bug: preflop bet called in wrong state!");
+    // region State: (PREFLOP|TURN|RIVER|SHOWDOWN) Bet
+    private prepareBetRound(): void {
+        this.mBetData.currentPlayerIdx = this.mDealer; // TODO: Proper poker behaviour
+        this.mBetData.playersToProcess = this.wasined(this.mDealer, this.mPlayers.length);
+        this.mBetData.lastBet = 0;
+    }
+
+    private computeBet(): void {
+        if (this.mCurrentState !== GameState.PREFLOP_BET && this.mCurrentState !== GameState.TURN_BET
+            && this.mCurrentState !== GameState.RIVER_BET && this.mCurrentState !== GameState.SHOWDOWN_BET) {
+            console.error("Bug: compute bet called in wrong state!");
             return; // Refuse
         }
 
         if (this.mBetData.remainingPlayers === 1) {
-            this.advanceState(); // --> Flop
+            this.advanceState(); // --> Flop / Turn / River / Showdown
         }
 
         let res: number = this.mBetData.processNext()!;
@@ -217,6 +273,32 @@ export class Game {
                 content: null
             } as BetRequestMessage);
         }
+    }
+    // endregion
+
+    // region State: Flop|Turn|River
+    private revealCards(amount: number): void {
+        if (this.mCurrentState !== GameState.FLOP
+            && this.mCurrentState !== GameState.TURN
+            && this.mCurrentState !== GameState.RIVER) {
+            console.error("Bug: reveal cards called in wrong state!");
+            return; // Refuse
+        }
+
+        let communityCards: Card[] = [];
+
+        for (let i = 0; i < amount; i++) {
+            communityCards.push(this.mAvailableCards.splice(rndInt(0, this.mAvailableCards.length - 1), 1)[0]);
+        }
+
+        // Next betting round: TURN_BET|RIVER_BET|SHOWDOWN_BET
+        this.advanceState();
+
+        this.mGameEventCallback(CallbackType.BROADCAST_CONFIRM, this.update, {
+            recipient: null,
+            gameEvent: GameEvent.REVEAL_COMMUNITY,
+            content: communityCards
+        } as RevealCommunityCardsMessage);
     }
     // endregion
 
@@ -245,6 +327,7 @@ export class Game {
                 }
 
                 pl.balance -= bd.lastBet + msg.amount!;
+                this.mPot += bd.lastBet + msg.amount!;
                 bd.lastBet += msg.amount!;
                 break;
             case "call":
@@ -253,6 +336,7 @@ export class Game {
                 }
 
                 pl.balance -= bd.lastBet
+                this.mPot += bd.lastBet;
                 break;
             case "check":
                 if (bd.lastBet !== 0) {
@@ -277,31 +361,6 @@ export class Game {
         } as BetCompleteMessage);
 
         return [true, null];
-    }
-    // endregion
-
-    // region State: Flop
-    private flop(): void {
-        if (this.mCurrentState !== GameState.FLOP) {
-            console.error("Bug: flop called in wrong state!");
-            return; // Refuse
-        }
-
-        let communityCards: Card[] = [];
-
-        // Magic number 3: Cards revealed in FLOP phase
-        for (let i = 0; i < 3; i++) {
-            communityCards.push(this.mAvailableCards.splice(rndInt(0, this.mAvailableCards.length - 1), 1)[0]);
-        }
-
-        // Next betting round: TURN_BET
-        this.advanceState();
-
-        this.mGameEventCallback(CallbackType.BROADCAST_CONFIRM, this.update, {
-            recipient: null,
-            gameEvent: GameEvent.REVEAL_COMMUNITY,
-            content: communityCards
-        } as RevealCommunityCardsMessage);
     }
     // endregion
 
