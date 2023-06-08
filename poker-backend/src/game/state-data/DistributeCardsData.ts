@@ -5,11 +5,11 @@ export class DistributeCardsData {
         this.mCurrentPlayerIndex = 0;
     }
 
-    get currentPlayerIndex(): number {
+    public get currentPlayerIndex(): number {
         return this.mCurrentPlayerIndex;
     }
 
-    set currentPlayerIndex(value: number) {
+    public set currentPlayerIndex(value: number) {
         this.mCurrentPlayerIndex = value;
     }
 }
