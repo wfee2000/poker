@@ -17,6 +17,8 @@ export enum GameEvent {
     BET_REQUEST, // Sent to specific player telling him to bet
     BET_COMPLETE, // Sent to all players when a player has completed a bet
     REVEAL_COMMUNITY, // Sent to all players. Includes the computed community cards.
+    SHOWDOWN, // Sent to all players. Includes the cards of all players
+    GAME_ENDED,
 }
 
 export enum GameState {
@@ -83,4 +85,27 @@ export interface BetCompleteMessage extends GameMessage {
 export interface RevealCommunityCardsMessage extends GameMessage {
     recipient: null;
     content: Card[];
+}
+
+export interface ShowdownMessage extends GameMessage {
+    recipient: null;
+    content: {
+        hands: [
+            {
+                name: string;
+                cards: Card[];
+            }
+        ];
+        winners: [
+            {
+                name: string;
+            }
+        ];
+        amountPerWinner: number;
+    };
+}
+
+export interface GameEndedMessage extends GameMessage {
+    recipient: null,
+    content: null
 }

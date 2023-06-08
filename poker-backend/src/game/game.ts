@@ -1,22 +1,24 @@
 import {Player} from "./player";
 import {rndInt} from "../utils";
-import {Card, Deck} from "./card";
 import {
     BetCompleteMessage,
     BetRequestMessage,
     CallbackType,
     DistributeHandMessage,
     GameActionResult,
+    GameEndedMessage,
     GameEvent,
     GameEventCallback,
     GameStartMessage,
     GameState,
     isValidBetResponseMessage,
     PlayerUpdate,
-    RevealCommunityCardsMessage
+    RevealCommunityCardsMessage,
+    ShowdownMessage
 } from "./game-types";
 import {DistributeCardsData} from "./state-data/DistributeCardsData";
 import {BetData} from "./state-data/BetData";
+import {Card, Deck, PokerEvaluate} from "./card";
 
 export class Game {
     private static readonly MIN_PLAYERS: number = 2;
@@ -24,7 +26,6 @@ export class Game {
     private readonly mBigBlind: number;
     private readonly mSmallBlind: number;
     private readonly mStartBalance: number;
-    private readonly mAvailableCards: Card[];
     private readonly mGameEventCallback: GameEventCallback;
 
     // State data
@@ -35,6 +36,8 @@ export class Game {
     private mPlayers: Player[];
     private mDealer: number;
     private mPot: number;
+    private mCommunityCards: Card[];
+    private mAvailableCards: Card[];
 
     public constructor(eventCallback: GameEventCallback,
                        bigBlind: number = 10,
@@ -47,6 +50,7 @@ export class Game {
         this.mPlayers = [];
         this.mDealer = 0;
         this.mPot = 0;
+        this.mCommunityCards = [];
         this.mAvailableCards = Deck.slice(0, Deck.length);
         this.mCurrentState = GameState.WAITING_FOR_PLAYERS;
 
@@ -97,10 +101,10 @@ export class Game {
                 this.computeBet();
                 break;
             case GameState.SHOWDOWN:
-                // TODO
+                this.showdown();
                 break;
             case GameState.CLEANUP:
-                // TODO
+                this.clean();
                 break;
             default:
                 console.error(`Unknown game state!: ${GameState[this.mCurrentState]}`)
@@ -144,12 +148,9 @@ export class Game {
                 this.mCurrentState = GameState.SHOWDOWN;
                 break;
             case GameState.SHOWDOWN:
-                // TODO
                 this.mCurrentState = GameState.CLEANUP;
                 break;
             case GameState.CLEANUP:
-                // TODO
-                // Im really unsure about this. Either a) W4p or b) dist cards or c) a new state?
                 this.mCurrentState = GameState.WAITING_FOR_PLAYERS;
                 break;
             default:
@@ -193,6 +194,7 @@ export class Game {
             return [false, "Not enough players to start now!"];
         }
 
+        // TODO: Proper poker behaviour
         // Choose random player as dealer
         this.mDealer = rndInt(0, this.mPlayers.length - 1);
 
@@ -291,6 +293,8 @@ export class Game {
             communityCards.push(this.mAvailableCards.splice(rndInt(0, this.mAvailableCards.length - 1), 1)[0]);
         }
 
+        this.mCommunityCards = this.mCommunityCards.concat(communityCards);
+
         // Next betting round: TURN_BET|RIVER_BET|SHOWDOWN_BET
         this.advanceState();
 
@@ -299,6 +303,55 @@ export class Game {
             gameEvent: GameEvent.REVEAL_COMMUNITY,
             content: communityCards
         } as RevealCommunityCardsMessage);
+    }
+    // endregion
+
+    // region State: Showdown
+    private showdown(): void {
+        if (this.mCurrentState !== GameState.SHOWDOWN) {
+            console.error("Bug: showdown called in wrong state!");
+            return; // Refuse
+        }
+
+        let winners: Player[] = PokerEvaluate.evalWinners(this.mPlayers);
+
+        for (let winner of winners) {
+            winner.balance += this.mPot / winners.length;
+        }
+
+        this.advanceState(); // --> cleanup
+        this.mGameEventCallback(CallbackType.BROADCAST_CONFIRM, this.update, {
+            recipient: null,
+            gameEvent: GameEvent.SHOWDOWN,
+            content: {
+                hands: this.mPlayers.map(p => {
+                    return { name: p.name, cards: p.cards }
+                }),
+                winners: winners.map(p => {
+                    return { name: p.name };
+                }),
+                amountPerWinner: this.mPot / winners.length
+            },
+        } as ShowdownMessage);
+    }
+    // endregion
+
+    // region State: cleanup
+    private clean(): void {
+        this.mPot = 0;
+        this.mCommunityCards = [];
+        this.mAvailableCards = Deck.slice(0, Deck.length);
+        this.mDistributeCardsData.currentPlayerIndex = 0;
+        this.mBetData.lastBet = 0;
+        this.mBetData.currentPlayerIdx = 0;
+
+        this.advanceState();
+
+        this.mGameEventCallback(CallbackType.BROADCAST_CONFIRM, this.update, {
+            recipient: null,
+            gameEvent: GameEvent.GAME_ENDED,
+            content: null
+        } as GameEndedMessage);
     }
     // endregion
 
