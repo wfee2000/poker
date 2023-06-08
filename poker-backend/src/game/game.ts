@@ -2,13 +2,17 @@ import {Player} from "./player";
 import {rndInt} from "../utils";
 import {Card, Deck} from "./card";
 import {
+    BetCompleteMessage,
     BetRequestMessage,
     CallbackType,
     DistributeHandMessage,
     GameActionResult,
     GameEvent,
     GameEventCallback,
-    GameState, isBetResponseMessage
+    GameStartMessage,
+    GameState,
+    isValidBetResponseMessage,
+    PlayerUpdate
 } from "./game-types";
 import {DistributeCardsData} from "./state-data/DistributeCardsData";
 import {BetData} from "./state-data/BetData";
@@ -47,7 +51,7 @@ export class Game {
         this.mBetData = new BetData();
     }
 
-    // region helpers
+    // region Helpers
     private wasined(num: number, len: number): number[] {
         let kekos: number[] = [];
 
@@ -63,7 +67,7 @@ export class Game {
     private update(): void {
         switch (this.mCurrentState) {
             case GameState.WAITING_FOR_PLAYERS:
-                // Do nothing
+                // No update for w4p... Do nothing.
                 break;
             case GameState.DISTRIBUTE_CARDS:
                 this.distributeCards();
@@ -89,10 +93,15 @@ export class Game {
             case GameState.DISTRIBUTE_CARDS:
                 this.mBetData.currentPlayerIdx = this.mDealer; // TODO: Proper poker behaviour
                 this.mBetData.playersToProcess = this.wasined(this.mDealer, this.mPlayers.length);
+                this.mBetData.lastBet = 0;
                 this.mCurrentState = GameState.PREFLOP_BET;
                 break;
             case GameState.PREFLOP_BET:
+                // TODO: do i need anything here?
                 this.mCurrentState = GameState.FLOP;
+                break;
+            case GameState.FLOP:
+                this.mCurrentState = GameState.TURN_BET;
                 break;
             default:
                 console.error(`Unknown game state!: ${GameState[this.mCurrentState]}`)
@@ -144,8 +153,10 @@ export class Game {
         this.mGameEventCallback(CallbackType.BROADCAST_CONFIRM, this.update, {
             recipient: null,
             gameEvent: GameEvent.START_OK,
-            content: null
-        });
+            content: this.mPlayers.map(p => {
+                return { name: p.name, balance: p.balance } as PlayerUpdate
+            }),
+        } as GameStartMessage);
 
         return [true, null];
     }
@@ -196,11 +207,16 @@ export class Game {
 
         let res: number = this.mBetData.processNext()!;
 
-        this.mGameEventCallback(CallbackType.SPECIFIC_CLIENT_WITH_RESULT, () => {}, {
-            recipient: this.mPlayers[this.mBetData.currentPlayerIdx].name,
-            gameEvent: GameEvent.BET_REQUEST,
-            content: null
-        } as BetRequestMessage);
+        // If the player is has folded call update to prevent losing context
+        if (!this.mPlayers[res].isActive) {
+            this.update();
+        } else {
+            this.mGameEventCallback(CallbackType.SPECIFIC_CLIENT_WITH_RESULT, () => {}, {
+                recipient: this.mPlayers[this.mBetData.currentPlayerIdx].name,
+                gameEvent: GameEvent.BET_REQUEST,
+                content: null
+            } as BetRequestMessage);
+        }
     }
     // endregion
 
@@ -212,26 +228,68 @@ export class Game {
             return [false, `Can not run bet now! Invalid state for bet ${GameState[this.mCurrentState]}`];
         }
 
-        if (!isBetResponseMessage(msg)){
+        if (!isValidBetResponseMessage(msg)){
             return [false, "Invalid bet message!"];
         }
 
-        // Note: player should always be current when this method is called
+        // Note: player should always be current when this method is called and should not have folded already
+
+        // TODO: Implement proper betting
+        let pl: Player = this.mPlayers[this.mBetData.currentPlayerIdx];
+        let bd: BetData = this.mBetData;
 
         switch (msg.action) {
             case "raise":
+                if (!pl.canAfford(bd.lastBet + msg.amount!)) {
+                    return [false, "You can not bet more than your current balance"];
+                }
+
+                pl.balance -= bd.lastBet + msg.amount!;
+                bd.lastBet += msg.amount!;
                 break;
             case "call":
+                if (!pl.canAfford(bd.lastBet)) {
+                    return [false, "You can not bet more than your current balance"];
+                }
+
+                pl.balance -= bd.lastBet
                 break;
             case "check":
+                if (bd.lastBet !== 0) {
+                    return [false, "You can not check if there is money on the line"];
+                }
                 break;
             case "fold":
+                // TODO: What if everyone folds?
+                pl.isActive = false;
                 break;
+            default:
+                return [false, "Invalid bet operation"];
         }
 
-        // TODO: call update or smth
+        this.mGameEventCallback(CallbackType.BROADCAST_CONFIRM, this.update, {
+            gameEvent: GameEvent.BET_COMPLETE,
+            content: {
+                name: pl.name,
+                action: msg.action,
+                amount: msg.amount,
+            }
+        } as BetCompleteMessage);
 
         return [true, null];
+    }
+    // endregion
+
+    // region State: Flop
+    private flop(): void {
+        if (this.mCurrentState !== GameState.FLOP) {
+            console.error("Bug: flop called in wrong state!");
+            return; // Refuse
+        }
+
+        // Pseudo
+        // 1. choose 3 random cards
+        // 2. broadcast cards
     }
     // endregion
 
@@ -252,6 +310,5 @@ export class Game {
     public get players() {
         return this.mPlayers;
     }
-
     // endregion
 }

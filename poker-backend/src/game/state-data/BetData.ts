@@ -1,9 +1,11 @@
 export class BetData {
     private mCurrentPlayerIdx: number;
     private mPlayersToProcess: number[];
+    private mLastBet: number;
 
     constructor() {
         this.mCurrentPlayerIdx = 0;
+        this.mLastBet = 0;
         this.mPlayersToProcess = [];
     }
 
@@ -30,5 +32,13 @@ export class BetData {
 
     public set currentPlayerIdx(idx: number) {
         this.mCurrentPlayerIdx = idx;
+    }
+
+    public get lastBet(): number {
+        return this.mLastBet;
+    }
+
+    public set lastBet(bet: number) {
+        this.mLastBet = bet;
     }
 }
