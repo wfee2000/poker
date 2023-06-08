@@ -12,10 +12,11 @@ export enum CallbackType {
 }
 
 export enum GameEvent {
-    START_OK, // Sent after the start function is called and completed sucessfully
+    START_OK, // Sent after the start function is called and completed successfully
     DISTRIBUTE_HAND, // Sent to specific player after hand was generated
     BET_REQUEST, // Sent to specific player telling him to bet
     BET_COMPLETE, // Sent to all players when a player has completed a bet
+    REVEAL_COMMUNITY, // Sent to all players. Includes the computed community cards.
 }
 
 export enum GameState {
@@ -77,4 +78,9 @@ export interface BetCompleteMessage extends GameMessage {
         action: BetAction;
         amount: number | null;
     };
+}
+
+export interface RevealCommunityCardsMessage extends GameMessage {
+    recipient: null;
+    content: Card[];
 }

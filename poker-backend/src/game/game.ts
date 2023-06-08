@@ -12,7 +12,7 @@ import {
     GameStartMessage,
     GameState,
     isValidBetResponseMessage,
-    PlayerUpdate
+    PlayerUpdate, RevealCommunityCardsMessage
 } from "./game-types";
 import {DistributeCardsData} from "./state-data/DistributeCardsData";
 import {BetData} from "./state-data/BetData";
@@ -287,9 +287,21 @@ export class Game {
             return; // Refuse
         }
 
-        // Pseudo
-        // 1. choose 3 random cards
-        // 2. broadcast cards
+        let communityCards: Card[] = [];
+
+        // Magic number 3: Cards revealed in FLOP phase
+        for (let i = 0; i < 3; i++) {
+            communityCards.push(this.mAvailableCards.splice(rndInt(0, this.mAvailableCards.length - 1), 1)[0]);
+        }
+
+        // Next betting round: TURN_BET
+        this.advanceState();
+
+        this.mGameEventCallback(CallbackType.BROADCAST_CONFIRM, this.update, {
+            recipient: null,
+            gameEvent: GameEvent.REVEAL_COMMUNITY,
+            content: communityCards
+        } as RevealCommunityCardsMessage);
     }
     // endregion
 
