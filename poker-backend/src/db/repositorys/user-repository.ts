@@ -11,12 +11,10 @@ export class DBUserRepository {
             const statement: Statement = await connection.prepare(sql);
             await statement.run({1: user.name, 2: user.password, 3: user.deposit});
             await statement.finalize();
+            await DB.commitTransaction(connection);
         } catch (e) {
             console.log(e);
             await DB.rollbackTransaction(connection);
-            return;
-        } finally {
-            await DB.commitTransaction(connection);
         }
     }
 
@@ -34,12 +32,11 @@ export class DBUserRepository {
             if (typeof result !== "undefined") {
                 id = result.id;
             }
+
+            await DB.commitTransaction(connection);
         } catch (e) {
             console.log(e);
             await DB.rollbackTransaction(connection);
-            return id;
-        } finally {
-            await DB.commitTransaction(connection);
         }
 
         return id;

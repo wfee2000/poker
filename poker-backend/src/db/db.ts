@@ -10,6 +10,7 @@ export class DB {
             driver: Driver
         });
 
+        await db.run("PRAGMA foreign_keys = ON;");
         await DB.ensureTablesCreated(db);
 
         return db;
