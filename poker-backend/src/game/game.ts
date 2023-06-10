@@ -313,7 +313,7 @@ export class Game {
             return; // Refuse
         }
 
-        let winners: Player[] = PokerEvaluate.evalWinners(this.mPlayers);
+        let winners: Player[] = PokerEvaluate.evalWinners(this.mPlayers, this.mCommunityCards);
 
         for (let winner of winners) {
             winner.balance += this.mPot / winners.length;
