@@ -63,8 +63,15 @@ export class Room extends WebSocketServer {
         ws.on("message", data => {
             const object = JSON.parse(data.toString());
             if (!this.started && object.context === "start") {
-                this.started = true;
-                this.game.start();
+
+                let [success, message] = this.game.start();
+
+                if (success) {
+                    this.started = true;
+                } else {
+                    user.ws!.send(JSON.stringify({context: "ERROR", content: message}));
+                    console.debug(message);
+                }
             }
 
             if (this.waitingPlayers.includes(user)) {
@@ -78,7 +85,6 @@ export class Room extends WebSocketServer {
                     }
                 } else {
                     if (object.context === "bet") {
-                        // @ts-ignore TODO: hellp
                         let [success, message]: GameActionResult = this.game.bet(object.content);
 
                         if (success) {
