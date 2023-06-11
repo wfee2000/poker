@@ -159,6 +159,7 @@ export class Game {
                 console.error(`Unknown game state!: ${GameState[this.mCurrentState]}`)
                 break;
         }
+        console.log(this.mCurrentState)
     }
     // endregion
 
@@ -345,6 +346,7 @@ export class Game {
         this.mBetData.lastBet = this.mBigBlind;
         this.mBetData.currentPlayerIdx = 0;
 
+        console.log("im a cleaaaaaaaaaaaaner")
         this.advanceState();
 
         this.mRoom.onGameEvent(CallbackType.BROADCAST_CONFIRM,  {
@@ -434,6 +436,10 @@ export class Game {
 
     public get startBalance(): number {
         return this.mStartBalance;
+    }
+
+    public get hasStarted() {
+        return this.mCurrentState !== GameState.WAITING_FOR_PLAYERS
     }
 
     // TODO: remove

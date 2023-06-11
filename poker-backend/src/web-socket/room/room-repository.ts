@@ -23,7 +23,7 @@ export class RoomRepository {
 
     static getAll() {
         
-        return this.rooms.filter(room => !room.started).map(room => {
+        return this.rooms.filter(room => !room.hasStarted).map(room => {
             return {
                 id : room.id,
                 users: room.users.length,

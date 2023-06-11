@@ -12,7 +12,6 @@ import {
 import { MessageStructure } from "../model/message-structure";
 
 export class Room extends WebSocketServer {
-	public started: boolean;
 	private waitingPlayers: User[] = [];
 	private waitingForOk: boolean;
 	private game: Game;
@@ -25,7 +24,6 @@ export class Room extends WebSocketServer {
 		super({ noServer: true });
 		super.on("connection", this.onConnection);
 		this.game = new Game(this);
-		this.started = false;
 		this.waitingForOk = false;
 		this.next = undefined;
 	}
@@ -83,12 +81,10 @@ export class Room extends WebSocketServer {
 
 		ws.on("message", (data) => {
 			const object = JSON.parse(data.toString());
-			if (!this.started && object.context === "start") {
+			if (object.context === "start") {
 				let [success, message] = this.game.start();
 
-				if (success) {
-					this.started = true;
-				} else {
+				if (!success) {
 					user.ws!.send(
 						JSON.stringify({ context: "ERROR", content: message }),
 					);
@@ -198,5 +194,9 @@ export class Room extends WebSocketServer {
 				}
 				break;
 		}
+	}
+
+	public get hasStarted() {
+		return this.game.hasStarted
 	}
 }

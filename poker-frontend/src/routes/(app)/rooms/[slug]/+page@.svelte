@@ -119,10 +119,13 @@
 				message.content.hands.forEach((hand: any) => {
 					let player = players.find((a) => a.name == hand.name);
 					if (!player || player.name == name) return;
-					positionCard(players.indexOf(player), hand.cards.map((card: [string, string]) => ({
-						suit: card[0],
-						rank: Number(card[1]),
-					})));
+					positionCard(
+						players.indexOf(player),
+						hand.cards.map((card: [string, string]) => ({
+							suit: card[0],
+							rank: Number(card[1]),
+						})),
+					);
 					//player.balance += message.content.amountPerWinner;
 					player = player;
 					players = players;
@@ -136,6 +139,23 @@
 					player = player;
 					players = players;
 				});
+
+				let timeout = setTimeout(() => {
+					ws?.send(
+						JSON.stringify({
+							context: "ok",
+						}),
+					);
+					clearTimeout(timeout)
+				}, 10_000);
+			} else if (message.gameEvent == 6) {
+				gameStarted = false;
+				removeCards();
+				communityCards = [];
+
+				ws?.send(JSON.stringify({
+					context: "ok"
+				}))
 			}
 		};
 		ws.onerror = (e) => {
@@ -235,7 +255,7 @@
 	};
 
 	const positionCard = (id: number, hand: card[]) => {
-		console.log(`player ${id} has ${hand.length} cards`)
+		console.log(`player ${id} has ${hand.length} cards`);
 		if (hand.length != 2) return;
 
 		const player = document.getElementById(`player ${id}`);

@@ -98,7 +98,7 @@ app.get("/rooms/:id", (req, res) => {
 	res.status(200).json({
 		id: room.id,
 		users: room.users,
-		started: room.started,
+		started: room.hasStarted,
 	});
 });
 
