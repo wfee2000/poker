@@ -44,6 +44,7 @@ export class UserRepository {
         try {
             if (!user || user.ws !== null) {
                 release();
+                
                 return false;
             }
 

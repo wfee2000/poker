@@ -13,7 +13,7 @@ export class DBUserRepository {
             await statement.finalize();
             await DB.commitTransaction(connection);
         } catch (e) {
-            console.log(e);
+            
             await DB.rollbackTransaction(connection);
         }
     }
@@ -35,7 +35,7 @@ export class DBUserRepository {
 
             await DB.commitTransaction(connection);
         } catch (e) {
-            console.log(e);
+            
             await DB.rollbackTransaction(connection);
         }
 

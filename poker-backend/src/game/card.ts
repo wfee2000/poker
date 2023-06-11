@@ -56,7 +56,9 @@ export class PokerEvaluate {
                 cards.splice(cards.findIndex(c => c[1] === num), 1);
             }
 
-            let secondary: [PokerHand, number[]] = this.evalCards(cards);
+            let remainingPlayerCards = pl.cards.filter(c => cards.includes(c));
+
+            let secondary: [PokerHand, number[]] = this.evalCards(remainingPlayerCards);
             evaluation.set(pl, [primary, secondary]);
         }
 
@@ -64,12 +66,12 @@ export class PokerEvaluate {
 
         for (let [k, v] of evaluation) {
             if (winners.length === 0) {
-                console.log(k, v);
+                
                 winners.push([k, v]);
             } else {
-                console.log(k, v);
+                
                 let cmp = this.compareEvals(winners[0][1], v);
-                console.log(cmp);
+                
 
                 if (cmp < 0) { // current won
                     winners.length = 0;

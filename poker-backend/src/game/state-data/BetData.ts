@@ -14,7 +14,7 @@ export class BetData {
             return null;
         }
 
-        this.mCurrentPlayerIdx = this.mPlayersToProcess.slice(0, 1)[0];
+        this.mCurrentPlayerIdx = this.mPlayersToProcess.splice(0, 1)[0];
         return this.mCurrentPlayerIdx; // remove first element
     }
 
@@ -40,5 +40,9 @@ export class BetData {
 
     public set lastBet(bet: number) {
         this.mLastBet = bet;
+    }
+
+    public get playersToProcess() {
+        return this.mPlayersToProcess;
     }
 }
