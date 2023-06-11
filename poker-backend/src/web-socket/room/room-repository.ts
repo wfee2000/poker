@@ -8,15 +8,27 @@ export class RoomRepository {
     private static mutex: Mutex = new Mutex();
 
     static get(id: number): Room | undefined {
-        if (id < 1000) {
+        if (id >= 1000) {
             return;
         }
 
-        return this.rooms.find(room => room.id);
+        
+
+        return this.rooms.find(room => room.id === id);
     }
 
     static getAllIds(): number[] {
         return this.rooms.map(room => room.id);
+    }
+
+    static getAll() {
+        
+        return this.rooms.filter(room => !room.hasStarted).map(room => {
+            return {
+                id : room.id,
+                users: room.users.length,
+            }
+        });
     }
 
     static async create(): Promise<Room | undefined>{

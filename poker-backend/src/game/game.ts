@@ -19,6 +19,7 @@ import {
 import {DistributeCardsData} from "./state-data/DistributeCardsData";
 import {BetData} from "./state-data/BetData";
 import {Card, Deck, PokerEvaluate} from "./card";
+import { Room } from "../web-socket/room/room";
 
 export class Game {
     private static readonly MIN_PLAYERS: number = 2;
@@ -26,7 +27,7 @@ export class Game {
     private readonly mBigBlind: number;
     private readonly mSmallBlind: number;
     private readonly mStartBalance: number;
-    private readonly mGameEventCallback: GameEventCallback;
+    private readonly mRoom: Room;
 
     // State data
     private readonly mDistributeCardsData: DistributeCardsData;
@@ -39,14 +40,14 @@ export class Game {
     private mCommunityCards: Card[];
     private mAvailableCards: Card[];
 
-    public constructor(eventCallback: GameEventCallback,
+    public constructor(room: Room,
                        bigBlind: number = 10,
                        smallBlind: number = bigBlind / 2,
                        startBalance: number = bigBlind * 100) {
         this.mBigBlind = bigBlind;
         this.mSmallBlind = smallBlind;
         this.mStartBalance = startBalance;
-        this.mGameEventCallback = eventCallback;
+        this.mRoom = room;
         this.mPlayers = [];
         this.mDealer = 0;
         this.mPot = 0;
@@ -71,7 +72,7 @@ export class Game {
     // endregion
 
     // region State management
-    private update(): void {
+    public update(): void {
         switch (this.mCurrentState) {
             case GameState.WAITING_FOR_PLAYERS:
                 // No update for w4p... Do nothing.
@@ -113,6 +114,7 @@ export class Game {
     }
 
     private advanceState(): void {
+        console.log(this.mCurrentState)
         switch (this.mCurrentState) {
             case GameState.WAITING_FOR_PLAYERS:
                 this.mDistributeCardsData.currentPlayerIndex = 0;
@@ -157,6 +159,7 @@ export class Game {
                 console.error(`Unknown game state!: ${GameState[this.mCurrentState]}`)
                 break;
         }
+        console.log(this.mCurrentState)
     }
     // endregion
 
@@ -201,7 +204,7 @@ export class Game {
         // --> Distribute cards
         this.advanceState();
 
-        this.mGameEventCallback(CallbackType.BROADCAST_CONFIRM, this.update, {
+        this.mRoom.onGameEvent(CallbackType.BROADCAST_CONFIRM,  {
             recipient: null,
             gameEvent: GameEvent.START_OK,
             content: this.mPlayers.map(p => {
@@ -216,6 +219,7 @@ export class Game {
 
     // region State: Distribute cards
     private distributeCards(): void {
+        
         if (this.mCurrentState !== GameState.DISTRIBUTE_CARDS) {
             console.error("Bug: distribute cards called in wrong state!");
             return; // Refuse
@@ -236,7 +240,7 @@ export class Game {
             this.advanceState();
         }
 
-        this.mGameEventCallback(CallbackType.CLIENT_CONFIRM, this.update, {
+        this.mRoom.onGameEvent(CallbackType.CLIENT_CONFIRM,  {
             recipient: player.name,
             gameEvent: GameEvent.DISTRIBUTE_HAND,
             content: player.cards
@@ -249,18 +253,15 @@ export class Game {
     private prepareBetRound(): void {
         this.mBetData.currentPlayerIdx = this.mDealer; // TODO: Proper poker behaviour
         this.mBetData.playersToProcess = this.wasined(this.mDealer, this.mPlayers.length);
-        this.mBetData.lastBet = 0;
+        this.mBetData.lastBet = this.mBigBlind;
     }
 
     private computeBet(): void {
+        
         if (this.mCurrentState !== GameState.PREFLOP_BET && this.mCurrentState !== GameState.TURN_BET
             && this.mCurrentState !== GameState.RIVER_BET && this.mCurrentState !== GameState.SHOWDOWN_BET) {
             console.error("Bug: compute bet called in wrong state!");
             return; // Refuse
-        }
-
-        if (this.mBetData.remainingPlayers === 1) {
-            this.advanceState(); // --> Flop / Turn / River / Showdown
         }
 
         let res: number = this.mBetData.processNext()!;
@@ -269,7 +270,7 @@ export class Game {
         if (!this.mPlayers[res].isActive) {
             this.update();
         } else {
-            this.mGameEventCallback(CallbackType.SPECIFIC_CLIENT_WITH_RESULT, () => {}, {
+            this.mRoom.onGameEvent(CallbackType.SPECIFIC_CLIENT_WITH_RESULT, {
                 recipient: this.mPlayers[this.mBetData.currentPlayerIdx].name,
                 gameEvent: GameEvent.BET_REQUEST,
                 content: null
@@ -298,10 +299,10 @@ export class Game {
         // Next betting round: TURN_BET|RIVER_BET|SHOWDOWN_BET
         this.advanceState();
 
-        this.mGameEventCallback(CallbackType.BROADCAST_CONFIRM, this.update, {
+        this.mRoom.onGameEvent(CallbackType.BROADCAST_CONFIRM, {
             recipient: null,
             gameEvent: GameEvent.REVEAL_COMMUNITY,
-            content: communityCards
+            content: this.mCommunityCards
         } as RevealCommunityCardsMessage);
     }
     // endregion
@@ -320,7 +321,7 @@ export class Game {
         }
 
         this.advanceState(); // --> cleanup
-        this.mGameEventCallback(CallbackType.BROADCAST_CONFIRM, this.update, {
+        this.mRoom.onGameEvent(CallbackType.BROADCAST_CONFIRM,  {
             recipient: null,
             gameEvent: GameEvent.SHOWDOWN,
             content: {
@@ -342,12 +343,13 @@ export class Game {
         this.mCommunityCards = [];
         this.mAvailableCards = Deck.slice(0, Deck.length);
         this.mDistributeCardsData.currentPlayerIndex = 0;
-        this.mBetData.lastBet = 0;
+        this.mBetData.lastBet = this.mBigBlind;
         this.mBetData.currentPlayerIdx = 0;
 
+        console.log("im a cleaaaaaaaaaaaaner")
         this.advanceState();
 
-        this.mGameEventCallback(CallbackType.BROADCAST_CONFIRM, this.update, {
+        this.mRoom.onGameEvent(CallbackType.BROADCAST_CONFIRM,  {
             recipient: null,
             gameEvent: GameEvent.GAME_ENDED,
             content: null
@@ -382,6 +384,7 @@ export class Game {
                 pl.balance -= bd.lastBet + msg.amount!;
                 this.mPot += bd.lastBet + msg.amount!;
                 bd.lastBet += msg.amount!;
+
                 break;
             case "call":
                 if (!pl.canAfford(bd.lastBet)) {
@@ -390,6 +393,7 @@ export class Game {
 
                 pl.balance -= bd.lastBet
                 this.mPot += bd.lastBet;
+
                 break;
             case "check":
                 if (bd.lastBet !== 0) {
@@ -404,7 +408,11 @@ export class Game {
                 return [false, "Invalid bet operation"];
         }
 
-        this.mGameEventCallback(CallbackType.BROADCAST_CONFIRM, this.update, {
+        if (this.mBetData.remainingPlayers === 0) {
+            this.advanceState(); // --> Flop / Turn / River / Showdown
+        }
+
+        this.mRoom.onGameEvent(CallbackType.BROADCAST_CONFIRM,  {
             gameEvent: GameEvent.BET_COMPLETE,
             content: {
                 name: pl.name,
@@ -428,6 +436,10 @@ export class Game {
 
     public get startBalance(): number {
         return this.mStartBalance;
+    }
+
+    public get hasStarted() {
+        return this.mCurrentState !== GameState.WAITING_FOR_PLAYERS
     }
 
     // TODO: remove
