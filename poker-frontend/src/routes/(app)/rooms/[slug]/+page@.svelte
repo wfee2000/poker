@@ -12,6 +12,7 @@
 		name: string;
 		balance: number;
 		lastAction?: string;
+		cards? : card[]
 	}[] = [];
 
 	let gameStarted = false;
@@ -71,6 +72,8 @@
 				}));
 				await tick();
 				positionCard(0, hand);
+				players[0].cards = hand;
+				players[0].lastAction = evalCards(hand);
 				ws?.send(
 					JSON.stringify({
 						context: "ok",
@@ -87,7 +90,9 @@
 				if (!player) return;
 
 				player.balance -= message.content.amount ?? 0;
-				player.lastAction = message.content.action;
+				if(player.name != name) {
+					player.lastAction = message.content.action;
+				}
 				player = player;
 				players = players;
 
@@ -108,6 +113,12 @@
 					}),
 				);
 
+				if(players[0].cards !== undefined) {
+					players[0].lastAction = evalCards([...players[0].cards, ...communityCards])
+				}
+
+				players = players;
+
 				await tick();
 
 				ws?.send(
@@ -118,24 +129,27 @@
 			} else if (message.gameEvent == 5) {
 				message.content.hands.forEach((hand: any) => {
 					let player = players.find((a) => a.name == hand.name);
-					if (!player || player.name == name) return;
-					positionCard(
-						players.indexOf(player),
-						hand.cards.map((card: [string, string]) => ({
+					if(!player) return;
+					let cards = hand.cards.map((card: [string, string]) => ({
 							suit: card[0],
 							rank: Number(card[1]),
-						})),
-					);
-					//player.balance += message.content.amountPerWinner;
+						}));
+					player.lastAction = evalCards([...cards, ...communityCards]);
 					player = player;
 					players = players;
+					if (player.name == name) return;
+					positionCard(
+						players.indexOf(player),
+						cards,
+					);
+					//player.balance += message.content.amountPerWinner;
 				});
 
 				message.content.winners.forEach((winner: any) => {
 					let player = players.find((a) => a.name == winner.name);
 					if (!player) return;
 					//player.balance += message.content.amountPerWinner;
-					player.lastAction = "won";
+					player.lastAction += " won";
 					player = player;
 					players = players;
 				});
@@ -170,6 +184,7 @@
 	import Card from "$lib/card.svelte";
 	import { pixelsToVh, pixelsToVw } from "$lib/utils";
 	import type { Card as card } from "$lib/types";
+	import { evalCards } from "$lib/card";
 
 	let communityCards: card[] = [];
 	$: hiddenCards = new Array(5 - communityCards.length);

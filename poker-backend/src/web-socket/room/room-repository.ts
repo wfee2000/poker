@@ -12,8 +12,6 @@ export class RoomRepository {
             return;
         }
 
-        
-
         return this.rooms.find(room => room.id === id);
     }
 
