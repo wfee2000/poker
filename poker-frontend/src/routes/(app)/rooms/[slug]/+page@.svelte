@@ -286,7 +286,7 @@
 			props: {
 				rank: hand[0].rank,
 				suit: hand[0].suit,
-				style: `absolute z-0 -rotate-[20deg] card`,
+				style: `absolute z-0 -rotate-[20deg] card transition-all duration-500 hover:-translate-y-10 hover:rotate-[0deg] hover:z-10 hover:after:-rotate-[20deg] hover:after:translate-y-0 hover:after:z-0`,
 				left: pixelsToVw(rect.left),
 				top: pixelsToVh(rect.top) - pixelsToVh(cardHeight / 2),
 			},
@@ -297,7 +297,7 @@
 			props: {
 				rank: hand[1].rank,
 				suit: hand[1].suit,
-				style: "absolute z-0 card",
+				style: "absolute z-0 card hover:-translate-y-10 transition-all duration-500 hover:-translate-y-10 hover:z-10 hover:after:translate-y-0 hover:after:z-0",
 				left: pixelsToVw(rect.left) + pixelsToVw(cardWidth / 2),
 				top: pixelsToVh(rect.top) - pixelsToVh(cardHeight / 2),
 			},
